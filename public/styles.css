@@ -257,6 +257,50 @@ body {
   font-size: 1.5rem;
   cursor: pointer;
   color: var(--text-primary);
+  padding: 0.5rem;
+  border-radius: var(--radius-medium);
+  transition: var(--transition);
+}
+
+.mobile-toggle:hover {
+  background: var(--background-color);
+  color: var(--primary-color);
+}
+
+.mobile-toggle:active {
+  transform: scale(0.95);
+}
+
+.hamburger {
+  width: 24px;
+  height: 18px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.hamburger span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background: currentColor;
+  border-radius: 1px;
+  transition: var(--transition);
+  transform-origin: center;
+}
+
+.mobile-toggle.active .hamburger span:nth-child(1) {
+  transform: translateY(8px) rotate(45deg);
+}
+
+.mobile-toggle.active .hamburger span:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0);
+}
+
+.mobile-toggle.active .hamburger span:nth-child(3) {
+  transform: translateY(-8px) rotate(-45deg);
 }
 
 /* Main Content */
@@ -1318,7 +1362,55 @@ body {
 
 @media (max-width: 968px) {
   .nav-menu {
-    display: none;
+    position: fixed;
+    top: 80px;
+    left: 0;
+    right: 0;
+    background: var(--surface-color);
+    border-top: 1px solid var(--border-color);
+    box-shadow: var(--shadow-large);
+    flex-direction: column;
+    padding: 1rem 0;
+    transform: translateY(-100%);
+    opacity: 0;
+    visibility: hidden;
+    transition: var(--transition);
+    z-index: 999;
+  }
+  
+  .nav-menu.active {
+    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
+  }
+  
+  .nav-menu::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: -1;
+    opacity: 0;
+    visibility: hidden;
+    transition: var(--transition);
+  }
+  
+  .nav-menu.active::before {
+    opacity: 1;
+    visibility: visible;
+  }
+  
+  .nav-link {
+    padding: 1rem 2rem;
+    border-radius: 0;
+    border-bottom: 1px solid var(--border-light);
+  }
+  
+  .nav-link:last-child {
+    border-bottom: none;
   }
   
   .mobile-toggle {
@@ -1354,6 +1446,20 @@ body {
   
   .search-box {
     display: none;
+  }
+  
+  .nav-menu {
+    top: 70px;
+  }
+  
+  .nav-link {
+    padding: 1.25rem 2rem;
+    font-size: 1rem;
+  }
+  
+  .nav-link i {
+    margin-right: 0.75rem;
+    font-size: 1.1rem;
   }
   
   .hero {

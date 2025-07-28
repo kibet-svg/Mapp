@@ -156,7 +156,38 @@ class CaryaApp {
 
         // Mobile toggle
         document.getElementById('mobile-toggle').addEventListener('click', () => {
-            document.getElementById('nav-menu').classList.toggle('active');
+            const navMenu = document.getElementById('nav-menu');
+            const mobileToggle = document.getElementById('mobile-toggle');
+            
+            navMenu.classList.toggle('active');
+            mobileToggle.classList.toggle('active');
+        });
+
+        // Close mobile menu when clicking on nav links
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                document.getElementById('nav-menu').classList.remove('active');
+                document.getElementById('mobile-toggle').classList.remove('active');
+            });
+        });
+
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const navMenu = document.getElementById('nav-menu');
+            const mobileToggle = document.getElementById('mobile-toggle');
+            
+            if (!navMenu.contains(e.target) && !mobileToggle.contains(e.target)) {
+                navMenu.classList.remove('active');
+                mobileToggle.classList.remove('active');
+            }
+        });
+
+        // Close mobile menu when window is resized to desktop
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 968) {
+                document.getElementById('nav-menu').classList.remove('active');
+                document.getElementById('mobile-toggle').classList.remove('active');
+            }
         });
     }
 
