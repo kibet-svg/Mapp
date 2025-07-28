@@ -25,6 +25,7 @@ app.use('/api/auth', require('./routes/auth').router);
 app.use('/api/jobs', require('./routes/jobs'));
 app.use('/api/marketplace', require('./routes/marketplace'));
 app.use('/api/chat', require('./routes/chat'));
+app.use('/api/admin', require('./routes/admin'));
 
 // Serve static files
 app.get('*', (req, res) => {

@@ -269,6 +269,7 @@ class CaryaApp {
     updateAuthUI() {
         const authBtns = document.querySelector('.auth-btn');
         const userProfile = document.getElementById('user-profile');
+        const adminNav = document.getElementById('admin-nav');
         
         if (this.currentUser) {
             document.querySelector('.auth-btn').style.display = 'none';
@@ -279,10 +280,18 @@ class CaryaApp {
             if (this.currentUser.avatar) {
                 document.getElementById('profile-avatar').src = this.currentUser.avatar;
             }
+
+            // Show admin nav if user is admin
+            if (this.currentUser.role === 'admin') {
+                adminNav.classList.remove('hidden');
+            } else {
+                adminNav.classList.add('hidden');
+            }
         } else {
             document.querySelector('.auth-btn').style.display = 'inline-block';
             document.querySelector('.auth-btn.primary').style.display = 'inline-block';
             userProfile.classList.add('hidden');
+            adminNav.classList.add('hidden');
         }
     }
 
@@ -317,6 +326,14 @@ class CaryaApp {
             case 'chat':
                 this.loadChatRooms();
                 break;
+            case 'admin':
+                if (this.currentUser && this.currentUser.role === 'admin') {
+                    this.loadAdminDashboard();
+                } else {
+                    this.showToast('Access denied. Admin privileges required.', 'error');
+                    this.navigateToSection('home');
+                }
+                break;
         }
     }
 
@@ -348,7 +365,10 @@ class CaryaApp {
             <div class="job-card" data-job-id="${job._id}">
                 <div class="job-header">
                     <div>
-                        <h3 class="job-title">${job.title}</h3>
+                        <h3 class="job-title">
+                            ${job.title}
+                            ${job.postedBy?.isVerified ? '<i class="fas fa-check-circle verified-badge" title="Verified User"></i>' : ''}
+                        </h3>
                         <p class="job-company">${job.company}</p>
                     </div>
                     <span class="job-type">${job.jobType}</span>
@@ -572,7 +592,10 @@ class CaryaApp {
                     <span class="product-badge">${product.condition || 'Service'}</span>
                 </div>
                 <div class="product-content">
-                    <h3 class="product-title">${product.title}</h3>
+                    <h3 class="product-title">
+                        ${product.title}
+                        ${product.seller?.isVerified ? '<i class="fas fa-check-circle verified-badge" title="Verified Seller"></i>' : ''}
+                    </h3>
                     <p class="product-price">$${product.price.amount}</p>
                     <p class="product-seller">by ${product.seller?.username || 'Unknown'}</p>
                     <p class="product-description">${product.description}</p>
@@ -1101,6 +1124,603 @@ class CaryaApp {
         this.filterJobs();
         
         this.showToast(`Searching for "${query}"`, 'info');
+    }
+
+    // Admin Methods
+    async loadAdminDashboard() {
+        await this.loadAdminStats();
+        await this.loadUsers();
+        this.setupAdminEventListeners();
+    }
+
+    setupAdminEventListeners() {
+        // Admin tabs
+        document.querySelectorAll('.admin-tabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const tab = e.target.dataset.tab;
+                this.switchAdminTab(tab);
+            });
+        });
+
+        // Admin actions
+        document.getElementById('create-test-users-btn').addEventListener('click', () => this.createTestUsers());
+        document.getElementById('refresh-stats-btn').addEventListener('click', () => this.loadAdminStats());
+        document.getElementById('filter-users-btn').addEventListener('click', () => this.filterUsers());
+
+        // User search
+        document.getElementById('user-search').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.filterUsers();
+            }
+        });
+    }
+
+    async loadAdminStats() {
+        try {
+            const response = await fetch('/api/admin/stats', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('carya_token')}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.renderAdminStats(data);
+            } else {
+                this.showToast(data.message || 'Failed to load stats', 'error');
+            }
+        } catch (error) {
+            console.error('Load admin stats error:', error);
+            this.showToast('Error loading admin stats', 'error');
+        }
+    }
+
+    renderAdminStats(stats) {
+        const statsContainer = document.getElementById('admin-stats');
+        
+        statsContainer.innerHTML = `
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-number">${stats.users.total}</div>
+                <div class="stat-label">Total Users</div>
+                <div class="stat-change positive">+${stats.users.recent} this month</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-number">${stats.users.verified}</div>
+                <div class="stat-label">Verified Users</div>
+                <div class="stat-change">${Math.round((stats.users.verified / stats.users.total) * 100)}% verified</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-briefcase"></i>
+                </div>
+                <div class="stat-number">${stats.jobs.total}</div>
+                <div class="stat-label">Total Jobs</div>
+                <div class="stat-change positive">+${stats.jobs.recent} this month</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-store"></i>
+                </div>
+                <div class="stat-number">${stats.products.total}</div>
+                <div class="stat-label">Marketplace Items</div>
+                <div class="stat-change positive">+${stats.products.recent} this month</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-comments"></i>
+                </div>
+                <div class="stat-number">${stats.chatRooms.total}</div>
+                <div class="stat-label">Chat Rooms</div>
+                <div class="stat-change">${stats.chatRooms.active} active</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="stat-number">${stats.users.suspended + stats.users.banned}</div>
+                <div class="stat-label">Moderated Users</div>
+                <div class="stat-change">${stats.users.suspended} suspended, ${stats.users.banned} banned</div>
+            </div>
+        `;
+    }
+
+    async loadUsers(page = 1) {
+        try {
+            const searchParams = new URLSearchParams({
+                page: page,
+                limit: 20
+            });
+
+            const search = document.getElementById('user-search')?.value;
+            const status = document.getElementById('user-status-filter')?.value;
+            const verified = document.getElementById('user-verified-filter')?.value;
+
+            if (search) searchParams.append('search', search);
+            if (status) searchParams.append('status', status);
+            if (verified) searchParams.append('verified', verified);
+
+            const response = await fetch(`/api/admin/users?${searchParams}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('carya_token')}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.renderUsersTable(data.users);
+                this.renderUsersPagination(data.currentPage, data.totalPages);
+            } else {
+                this.showToast(data.message || 'Failed to load users', 'error');
+            }
+        } catch (error) {
+            console.error('Load users error:', error);
+            this.showToast('Error loading users', 'error');
+        }
+    }
+
+    renderUsersTable(users) {
+        const tableContainer = document.getElementById('users-table');
+        
+        if (users.length === 0) {
+            tableContainer.innerHTML = '<p class="text-center">No users found.</p>';
+            return;
+        }
+
+        const tableHTML = `
+            <div class="table-header">
+                <div>User</div>
+                <div>Email</div>
+                <div>Status</div>
+                <div>Verified</div>
+                <div>Joined</div>
+                <div>Actions</div>
+            </div>
+            ${users.map(user => `
+                <div class="table-row">
+                    <div class="user-cell">
+                        <div class="user-avatar">
+                            ${user.avatar ? 
+                                `<img src="${user.avatar}" alt="${user.username}">` : 
+                                user.username.charAt(0).toUpperCase()
+                            }
+                        </div>
+                        <div class="user-info">
+                            <h4>${user.username}</h4>
+                            <p>${user.role}</p>
+                        </div>
+                    </div>
+                    <div>${user.email}</div>
+                    <div>
+                        <span class="status-badge ${user.status}">${user.status}</span>
+                    </div>
+                    <div>
+                        <span class="verified-badge ${user.isVerified ? 'verified' : 'unverified'}">
+                            <i class="fas fa-${user.isVerified ? 'check-circle' : 'times-circle'}"></i>
+                            ${user.isVerified ? 'Verified' : 'Unverified'}
+                        </span>
+                    </div>
+                    <div>${this.formatDate(user.createdAt)}</div>
+                    <div class="user-actions">
+                        <button class="btn small secondary" onclick="app.showUserActions('${user._id}')">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('')}
+        `;
+
+        tableContainer.innerHTML = tableHTML;
+    }
+
+    renderUsersPagination(currentPage, totalPages) {
+        const container = document.getElementById('users-pagination');
+        
+        if (totalPages <= 1) {
+            container.innerHTML = '';
+            return;
+        }
+
+        let paginationHTML = '';
+        
+        if (currentPage > 1) {
+            paginationHTML += `<button onclick="app.loadUsers(${currentPage - 1})">Previous</button>`;
+        }
+
+        for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
+            paginationHTML += `
+                <button class="${i === currentPage ? 'active' : ''}" 
+                        onclick="app.loadUsers(${i})">${i}</button>
+            `;
+        }
+
+        if (currentPage < totalPages) {
+            paginationHTML += `<button onclick="app.loadUsers(${currentPage + 1})">Next</button>`;
+        }
+
+        container.innerHTML = paginationHTML;
+    }
+
+    async showUserActions(userId) {
+        try {
+            const response = await fetch(`/api/admin/users/${userId}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('carya_token')}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.currentSelectedUser = data.user;
+                this.renderUserActionModal(data.user, data.stats);
+                this.showModal('user-action-modal');
+            } else {
+                this.showToast(data.message || 'Failed to load user details', 'error');
+            }
+        } catch (error) {
+            console.error('Show user actions error:', error);
+            this.showToast('Error loading user details', 'error');
+        }
+    }
+
+    renderUserActionModal(user, stats) {
+        const userInfoContainer = document.getElementById('modal-user-info');
+        const title = document.getElementById('user-action-title');
+
+        title.textContent = `Actions for ${user.username}`;
+
+        userInfoContainer.innerHTML = `
+            <h4>${user.username}</h4>
+            <p><strong>Email:</strong> ${user.email}</p>
+            <p><strong>Status:</strong> <span class="status-badge ${user.status}">${user.status}</span></p>
+            <p><strong>Verified:</strong> ${user.isVerified ? 'Yes' : 'No'}</p>
+            <p><strong>Role:</strong> ${user.role}</p>
+            <p><strong>Joined:</strong> ${this.formatDate(user.createdAt)}</p>
+            <p><strong>Activity:</strong> ${stats.jobsPosted} jobs, ${stats.productsPosted} products, ${stats.roomsCreated} rooms</p>
+        `;
+
+        // Update button states
+        const verifyBtn = document.getElementById('toggle-verify-btn');
+        const promoteBtn = document.getElementById('promote-user-btn');
+
+        verifyBtn.innerHTML = `
+            <i class="fas fa-${user.isVerified ? 'times-circle' : 'check-circle'}"></i>
+            <span>${user.isVerified ? 'Remove Verification' : 'Verify User'}</span>
+        `;
+
+        promoteBtn.style.display = user.role === 'admin' ? 'none' : 'block';
+
+        // Setup event listeners for action buttons
+        this.setupUserActionButtons(user);
+    }
+
+    setupUserActionButtons(user) {
+        const verifyBtn = document.getElementById('toggle-verify-btn');
+        const suspendBtn = document.getElementById('suspend-user-btn');
+        const promoteBtn = document.getElementById('promote-user-btn');
+        const deleteBtn = document.getElementById('delete-user-btn');
+
+        // Remove existing listeners
+        verifyBtn.replaceWith(verifyBtn.cloneNode(true));
+        suspendBtn.replaceWith(suspendBtn.cloneNode(true));
+        promoteBtn.replaceWith(promoteBtn.cloneNode(true));
+        deleteBtn.replaceWith(deleteBtn.cloneNode(true));
+
+        // Add new listeners
+        document.getElementById('toggle-verify-btn').addEventListener('click', () => this.toggleUserVerification(user._id, !user.isVerified));
+        document.getElementById('suspend-user-btn').addEventListener('click', () => this.showSuspensionModal(user._id));
+        document.getElementById('promote-user-btn').addEventListener('click', () => this.promoteUser(user._id));
+        document.getElementById('delete-user-btn').addEventListener('click', () => this.deleteUser(user._id));
+    }
+
+    async toggleUserVerification(userId, isVerified) {
+        try {
+            const response = await fetch(`/api/admin/users/${userId}/verify`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('carya_token')}`
+                },
+                body: JSON.stringify({ isVerified })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showToast(data.message, 'success');
+                this.hideModal('user-action-modal');
+                this.loadUsers();
+            } else {
+                this.showToast(data.message || 'Failed to update verification', 'error');
+            }
+        } catch (error) {
+            console.error('Toggle verification error:', error);
+            this.showToast('Error updating verification', 'error');
+        }
+    }
+
+    showSuspensionModal(userId) {
+        this.currentSuspendUserId = userId;
+        this.hideModal('user-action-modal');
+        this.showModal('suspension-modal');
+
+        // Setup suspension form
+        document.getElementById('suspension-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const days = document.getElementById('suspension-days').value;
+            const reason = document.getElementById('suspension-reason').value;
+            this.suspendUser(userId, days, reason);
+        });
+    }
+
+    async suspendUser(userId, days, reason) {
+        try {
+            const response = await fetch(`/api/admin/users/${userId}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('carya_token')}`
+                },
+                body: JSON.stringify({
+                    status: 'suspended',
+                    suspendDays: parseInt(days),
+                    suspensionReason: reason
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showToast(data.message, 'success');
+                this.hideModal('suspension-modal');
+                document.getElementById('suspension-form').reset();
+                this.loadUsers();
+            } else {
+                this.showToast(data.message || 'Failed to suspend user', 'error');
+            }
+        } catch (error) {
+            console.error('Suspend user error:', error);
+            this.showToast('Error suspending user', 'error');
+        }
+    }
+
+    async promoteUser(userId) {
+        if (!confirm('Are you sure you want to promote this user to admin?')) return;
+
+        try {
+            const response = await fetch(`/api/admin/users/${userId}/promote`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('carya_token')}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showToast(data.message, 'success');
+                this.hideModal('user-action-modal');
+                this.loadUsers();
+            } else {
+                this.showToast(data.message || 'Failed to promote user', 'error');
+            }
+        } catch (error) {
+            console.error('Promote user error:', error);
+            this.showToast('Error promoting user', 'error');
+        }
+    }
+
+    async deleteUser(userId) {
+        if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
+
+        try {
+            const response = await fetch(`/api/admin/users/${userId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('carya_token')}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showToast(data.message, 'success');
+                this.hideModal('user-action-modal');
+                this.loadUsers();
+            } else {
+                this.showToast(data.message || 'Failed to delete user', 'error');
+            }
+        } catch (error) {
+            console.error('Delete user error:', error);
+            this.showToast('Error deleting user', 'error');
+        }
+    }
+
+    async createTestUsers() {
+        if (!confirm('Create 10 test users? This will add sample data to your platform.')) return;
+
+        this.showSpinner();
+
+        try {
+            const response = await fetch('/api/admin/test-users', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('carya_token')}`
+                },
+                body: JSON.stringify({ count: 10 })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showToast(data.message, 'success');
+                this.loadUsers();
+                this.loadAdminStats();
+            } else {
+                this.showToast(data.message || 'Failed to create test users', 'error');
+            }
+        } catch (error) {
+            console.error('Create test users error:', error);
+            this.showToast('Error creating test users', 'error');
+        } finally {
+            this.hideSpinner();
+        }
+    }
+
+    filterUsers() {
+        this.loadUsers(1); // Reset to first page when filtering
+    }
+
+    switchAdminTab(tab) {
+        // Update tab buttons
+        document.querySelectorAll('.admin-tabs .tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.tab === tab) {
+                btn.classList.add('active');
+            }
+        });
+
+        // Show/hide content
+        document.querySelectorAll('.admin-content').forEach(content => {
+            content.classList.add('hidden');
+        });
+
+        const targetContent = document.getElementById(`admin-${tab}`);
+        if (targetContent) {
+            targetContent.classList.remove('hidden');
+        }
+
+        // Load tab-specific data
+        switch (tab) {
+            case 'users':
+                this.loadUsers();
+                break;
+            case 'activity':
+                this.loadRecentActivity();
+                break;
+            case 'logs':
+                this.loadSystemLogs();
+                break;
+        }
+    }
+
+    async loadRecentActivity() {
+        try {
+            const response = await fetch('/api/admin/activity', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('carya_token')}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.renderRecentActivity(data);
+            } else {
+                this.showToast(data.message || 'Failed to load activity', 'error');
+            }
+        } catch (error) {
+            console.error('Load activity error:', error);
+        }
+    }
+
+    renderRecentActivity(data) {
+        const container = document.getElementById('activity-grid');
+
+        container.innerHTML = `
+            <div class="activity-section">
+                <h3><i class="fas fa-users"></i> Recent Users</h3>
+                ${data.recentUsers.map(user => `
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <i class="fas fa-user-plus"></i>
+                        </div>
+                        <div class="activity-content">
+                            <h4>${user.username}</h4>
+                            <p>Joined the platform</p>
+                        </div>
+                        <div class="activity-time">${this.formatDate(user.createdAt)}</div>
+                    </div>
+                `).join('')}
+            </div>
+            <div class="activity-section">
+                <h3><i class="fas fa-briefcase"></i> Recent Jobs</h3>
+                ${data.recentJobs.map(job => `
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <i class="fas fa-plus"></i>
+                        </div>
+                        <div class="activity-content">
+                            <h4>${job.title}</h4>
+                            <p>Posted by ${job.postedBy?.username || 'Unknown'} at ${job.company}</p>
+                        </div>
+                        <div class="activity-time">${this.formatDate(job.createdAt)}</div>
+                    </div>
+                `).join('')}
+            </div>
+            <div class="activity-section">
+                <h3><i class="fas fa-store"></i> Recent Products</h3>
+                ${data.recentProducts.map(product => `
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <i class="fas fa-${product.isService ? 'handshake' : 'box'}"></i>
+                        </div>
+                        <div class="activity-content">
+                            <h4>${product.title}</h4>
+                            <p>${product.isService ? 'Service' : 'Product'} by ${product.seller?.username || 'Unknown'} - $${product.price.amount}</p>
+                        </div>
+                        <div class="activity-time">${this.formatDate(product.createdAt)}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    async loadSystemLogs() {
+        try {
+            const response = await fetch('/api/admin/logs', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('carya_token')}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.renderSystemLogs(data.logs);
+            } else {
+                this.showToast(data.message || 'Failed to load logs', 'error');
+            }
+        } catch (error) {
+            console.error('Load logs error:', error);
+        }
+    }
+
+    renderSystemLogs(logs) {
+        const container = document.getElementById('logs-container');
+
+        container.innerHTML = `
+            <h3><i class="fas fa-file-alt"></i> System Logs</h3>
+            ${logs.map(log => `
+                <div class="log-item">
+                    <div class="log-level ${log.level}">${log.level}</div>
+                    <div class="log-content">
+                        <div class="log-action">${log.action}</div>
+                        <div class="log-details">${log.details}</div>
+                        <div class="log-meta">${this.formatDate(log.timestamp)} • IP: ${log.ip}</div>
+                    </div>
+                </div>
+            `).join('')}
+        `;
     }
 }
 
