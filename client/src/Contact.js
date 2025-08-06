@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { TextField, Button, Snackbar, Typography, Box } from '@mui/material';
 
 export default function Contact() {
   const [form, setForm] = useState({ name: '', email: '', message: '' });
@@ -15,15 +16,44 @@ export default function Contact() {
     setForm({ name: '', email: '', message: '' });
   };
   return (
-    <div>
-      <h2>Contact / Feedback</h2>
-      {sent && <p>Thank you for your message!</p>}
+    <Box maxWidth={500} mx="auto">
+      <Typography variant="h4" gutterBottom>Contact / Feedback</Typography>
       <form onSubmit={handleSubmit}>
-        <input name="name" placeholder="Name" value={form.name} onChange={handleChange} /><br />
-        <input name="email" placeholder="Email" value={form.email} onChange={handleChange} /><br />
-        <textarea name="message" placeholder="Message" value={form.message} onChange={handleChange} required /><br />
-        <button type="submit">Send</button>
+        <TextField
+          name="name"
+          label="Name"
+          value={form.name}
+          onChange={handleChange}
+          fullWidth
+          margin="normal"
+        />
+        <TextField
+          name="email"
+          label="Email"
+          value={form.email}
+          onChange={handleChange}
+          fullWidth
+          margin="normal"
+        />
+        <TextField
+          name="message"
+          label="Message"
+          value={form.message}
+          onChange={handleChange}
+          fullWidth
+          margin="normal"
+          multiline
+          rows={4}
+          required
+        />
+        <Button type="submit" variant="contained" color="primary" sx={{ mt: 2 }}>Send</Button>
       </form>
-    </div>
+      <Snackbar
+        open={sent}
+        autoHideDuration={3000}
+        onClose={() => setSent(false)}
+        message="Thank you for your message!"
+      />
+    </Box>
   );
 }

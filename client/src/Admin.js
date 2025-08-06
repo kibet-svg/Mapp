@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { TextField, Button, Typography, Box, List, ListItem, ListItemText, Paper, Alert } from '@mui/material';
 
 export default function Admin() {
   const [login, setLogin] = useState({ username: '', password: '' });
@@ -29,30 +30,51 @@ export default function Admin() {
   };
   if (!loggedIn) {
     return (
-      <div>
-        <h2>Admin Login</h2>
-        {error && <p style={{ color: 'red' }}>{error}</p>}
+      <Box maxWidth={400} mx="auto">
+        <Typography variant="h4" gutterBottom>Admin Login</Typography>
+        {error && <Alert severity="error">{error}</Alert>}
         <form onSubmit={handleLogin}>
-          <input name="username" placeholder="Username" value={login.username} onChange={handleChange} /><br />
-          <input name="password" type="password" placeholder="Password" value={login.password} onChange={handleChange} /><br />
-          <button type="submit">Login</button>
+          <TextField
+            name="username"
+            label="Username"
+            value={login.username}
+            onChange={handleChange}
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            name="password"
+            type="password"
+            label="Password"
+            value={login.password}
+            onChange={handleChange}
+            fullWidth
+            margin="normal"
+          />
+          <Button type="submit" variant="contained" color="primary" sx={{ mt: 2 }}>Login</Button>
         </form>
-      </div>
+      </Box>
     );
   }
   return (
-    <div>
-      <h2>Admin Dashboard</h2>
-      <h3>Messages/Feedback</h3>
-      <ul>
-        {messages.map(msg => (
-          <li key={msg.id}>
-            <b>{msg.name || 'Anonymous'}</b> ({msg.email || 'No email'})<br />
-            <i>{msg.created_at}</i><br />
-            {msg.message}
-          </li>
-        ))}
-      </ul>
-    </div>
+    <Box maxWidth={700} mx="auto">
+      <Typography variant="h4" gutterBottom>Admin Dashboard</Typography>
+      <Typography variant="h6" gutterBottom>Messages/Feedback</Typography>
+      <Paper>
+        <List>
+          {messages.map(msg => (
+            <ListItem key={msg.id} alignItems="flex-start" divider>
+              <ListItemText
+                primary={<>
+                  <b>{msg.name || 'Anonymous'}</b> ({msg.email || 'No email'})
+                  <Typography variant="caption" sx={{ ml: 1 }}>{msg.created_at}</Typography>
+                </>}
+                secondary={msg.message}
+              />
+            </ListItem>
+          ))}
+        </List>
+      </Paper>
+    </Box>
   );
 }
